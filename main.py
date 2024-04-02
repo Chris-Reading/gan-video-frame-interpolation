@@ -166,11 +166,12 @@ if __name__ == '__main__':
     iteration = 0
     epoch_count = 0
     
-    progress_bar = tqdm(total=training_batches*num_epochs)
     print(f"Starting the training loop for {num_epochs} epochs")
     for epoch in range(num_epochs):
         epoch_count += 1
         for batch_idx, data in enumerate(train_data):
+            startt = time.time()
+            progress_bar = tqdm(total=training_batches*num_epochs)
             progress_bar.update(1)
             progress_bar.set_description(f"Batch {batch_idx+1+(training_batches*(epoch_count-1))}/{training_batches*num_epochs} Epoch {epoch_count}/{num_epochs} ({(batch_idx+1+(training_batches*(epoch_count-1)))/(training_batches*num_epochs):.2f}%)")
             frames, label = data     
@@ -178,8 +179,10 @@ if __name__ == '__main__':
 
             for i in range(batch_size):
                 for j in range(7):
-                    frame_list.append(frames[j][i])      
-            
+                    frame_list.append(frames[j][i])
+
+            frame_list = torch.stack(frame_list).to(device)      
+            print("Disc")
             # # # # # # # # # # # # # # # #
             #    Training Discriminator   #
             # # # # # # # # # # # # # # # #
@@ -188,13 +191,15 @@ if __name__ == '__main__':
             optimizer_discriminator.zero_grad()
             
             # All real data
-            label = torch.full((batch_size,), real_label, dtype=torch.float, device=device)
+            print("Disc with real")
+            label = torch.full((batch_size*7,), real_label, dtype=torch.float, device=device)
             real_output = discriminator(frame_list).view(-1)
             d_real_error = BCE_loss(real_output, label)
             d_real_error.backward()
             d_real_mean_pred = real_output.mean().item()
 
             # All fake data
+            print("Disc with fake")
             label.fill_(fake_label)
             noise = torch.randn(batch_size*7, latent_dim, 1, 1, device=device)
             fake_frames = generator(noise)
@@ -202,22 +207,24 @@ if __name__ == '__main__':
             d_fake_error = BCE_loss(fake_output, label)
             d_fake_error.backward()
             d_fake_mean_pred = fake_output.mean().item()
-
+            
             d_error = d_real_error + d_fake_error
+            print("Optimizing disc parameters")
             optimizer_discriminator.step()
-
+            print("Gen")
             # # # # # # # # # # # # # #
             #    Training Generator   #
             # # # # # # # # # # # # # #
 
             generator.zero_grad()
             optimizer_generator.zero_grad()
-
+            print("Gen with fake")
             label.fill_(real_label) # Generator aims to have its data classified as real
             output = discriminator(fake_frames).view(-1)
             g_error = BCE_loss(output, label)
             g_error.backward()
             g_mean_pred = output.mean().item()
+            print("Optimizing gen parameters")
             optimizer_generator.step()
 
             g_losses.append(g_error.item())
@@ -225,7 +232,7 @@ if __name__ == '__main__':
             g_mean_preds.append(g_mean_pred)
             d_fake_mean_preds.append(d_fake_mean_pred)
             d_real_mean_preds.append(d_real_mean_pred)
-
+            print("Appended results")
 
             if (iteration % 100 == 0) or ((epoch == num_epochs-1) and (i == len(train_data)-1)):
                 with torch.no_grad():
@@ -233,6 +240,13 @@ if __name__ == '__main__':
                 generated_frames.append(vutils.make_grid(fake, padding=2, normalize=True, nrow=8))
 
             iteration += 1
+            print("Loop finished")
+            endt = time.time()
+            dif = endt-startt
+            print(f"{dif} seconds")
+
+    torch.save(generator.state_dict(), f'models/epoch{num_epochs}/batch{batch_size}/lr{learning_rate}/generator_final.pth')
+    torch.save(discriminator.state_dict(), f'models/epoch{num_epochs}/batch{batch_size}/lr{learning_rate}/discriminator_final.pth')
 
     plt.figure(figsize=(10,5))
     plt.title("Generator and Discriminator Loss During Training")
