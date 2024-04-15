@@ -36,16 +36,17 @@ import math                                 # math library - Used for calculatin
 import matplotlib.pyplot as plt
 import torchvision.utils as vutils
 import matplotlib.animation as animation
-from tqdm import tqdm
+import os
+from PIL import Image
+import torch.nn.functional as F
+from torchmetrics.image import PeakSignalNoiseRatio
+import cv2 as cv
 
 # Importing other scripts
-from dataset import VimeoDataset                                # VimeoDataset class from dataset.py
-from generator import Generator2D as Generator                  # Generator and Generator2D classes from generator.py
-from discriminator import Discriminator2D as Discriminator      # Discriminator and Discriminator2D classes from discriminator.py
-from format_time import format_duration                         # format_duration function from format_time.py
-from dataset_statistics import dataset_statistics               # dataset_statistics class from dataset_statistics.py
-from dataset_test import dataset_plot                           # dataset_plot function from dataset_test.py
-from gan import GAN
+from dataset import VimeoDataset, MSUDataset                                # VimeoDataset class from dataset.py
+from generator import VimeoGenerator2 as Generator                  # Generator and Generator2D classes from generator.py
+from discriminator import VimeoDiscriminator2 as Discriminator      # Discriminator and Discriminator2D classes from discriminator.py
+
 
 # Attempts to use a GPU if available, otherwise uses the users CPU.
 try:
@@ -63,12 +64,12 @@ torch.manual_seed(manualSeed)
 torch.use_deterministic_algorithms(True)
 
 # Hyperparameters
-batch_size = 32             # Number of videos per "batch"
+batch_size = 16             # Number of videos per "batch"
 latent_dim = 100            # 
 learning_rate = 0.0002
 beta1 = 0.5
 beta2 = 0.999
-num_epochs = 100
+num_epochs = 1
 worker_threads = 2
 colour_channels = 3
 lambda_temporal = 0.1
@@ -77,6 +78,7 @@ lambda_depth = 0.01
 # Global variables
 training_batches = int()
 training_remainder = int()
+psnr_calc = PeakSignalNoiseRatio()
 
 train_dataset_mean = [0.3675, 0.3393, 0.3194]
 train_dataset_standard_deviation = [0.2111, 0.1870, 0.1717]
@@ -86,23 +88,35 @@ dataset_standard_deviation = [0.20665579, 0.19933419, 0.19278685]
 
 # Creating DataLoaders for training and testing
 
-train_dataset = VimeoDataset(root_dir='src\\vimeo_septuplet', split='train')
-train_data = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=worker_threads)
+#dataset_choice = int(input("Dataset Vimeo (1) or MSU (2): "))
+dataset_choice = 1
+if dataset_choice == 1:
+    train_dataset = VimeoDataset(root_dir='src/vimeo_septuplet', split='train')
+    train_data = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=worker_threads)
+    N, in_channels, height, width = 7, 3, 512, 512
+    fixed_noise_1 = torch.randn(16, 3, 512, 512, device=device) # Creates 64 noise vectors with 100 dimensions
+    fixed_noise_2 = torch.randn(16, 3, 512, 512, device=device) # Creates 64 noise vectors with 100 dimensions
 
 training_batches = math.ceil(len(train_dataset) / batch_size)
 training_remainder = len(train_dataset) % batch_size
 #print(f"Dataset has {len(train_dataset)} videos, split into {training_batches} batches of size {batch_size} where the last batch consists of {training_remainder} videos")
 
-test_dataset = VimeoDataset(root_dir='src\\vimeo_septuplet', split='test')
-test_data = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, num_workers=worker_threads)
+#test_dataset = VimeoDataset(root_dir='/notebooks/src/vimeo_septuplet', split='test')
+#test_data = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, num_workers=worker_threads)
 
 # Initialize components
+generator = Generator().to(device)
+discriminator = Discriminator().to(device)
 
-N, in_channels, height, width = 8, 3, 512, 512
-generator = Generator(latent_dim, in_channels, N).to(device)
-discriminator = Discriminator(in_channels, N).to(device)
-
-#gan_model = GAN(gen=generator, dis=discriminator, latent_dim=latent_dim, lr=learning_rate)
+if torch.cuda.device_count() > 1:
+    generator = nn.DataParallel(generator)
+    discriminator = nn.DataParallel(discriminator)
+    
+if isinstance(generator, nn.DataParallel):
+    print("Generator is wrapped with DataParallel")
+    
+if isinstance(discriminator, nn.DataParallel):
+    print("Discriminator is wrapped with DataParallel")
 
 def initialize_weights(models):
     for model in models:
@@ -127,12 +141,11 @@ generator.apply(weights_init)
 discriminator.apply(weights_init)
 
 # Loss functions
-BCE_loss = nn.BCELoss()
+BCE_loss = nn.BCEWithLogitsLoss()
 #adversarial_loss = nn.BCELoss()
 #temporal_loss = nn.MSELoss()
 #depth_loss = nn.MSELoss()
 
-fixed_noise = torch.randn(64, latent_dim, 1, 1, device=device) # Creates 64 noise vectors with 100 dimensions
 real_label = 1.0
 fake_label = 0.0
 
@@ -148,13 +161,15 @@ if __name__ == '__main__':
     plt.title("Training images")
     frame_list = []
     frames, label = test_batch
+    print(len(frames), len(frames[0]))
     for i in range(batch_size):
-        for j in range(7):
+        for j in range(len(frames)):
             frame_list.append(frames[j][i])
 
-    print(len(frame_list)/7, len(frame_list)/batch_size, len(frame_list))
+    print(len(frame_list)/len(frames), len(frame_list)/batch_size, len(frame_list))
 
     plt.imshow(np.transpose(vutils.make_grid(frame_list, padding=1, normalize=True, nrow=14).cpu(),(1,2,0)))
+    plt.savefig('plots/random_batch.png', dpi=300, bbox_inches='tight')
     plt.show()
 
     generated_frames = []
@@ -165,24 +180,47 @@ if __name__ == '__main__':
     d_real_mean_preds = []
     iteration = 0
     epoch_count = 0
+    mse = []
+    psnr = []
+    ssim = []
+    fid = []
+    l1 = []
     
     print(f"Starting the training loop for {num_epochs} epochs")
     for epoch in range(num_epochs):
         epoch_count += 1
         for batch_idx, data in enumerate(train_data):
+            iteration += 1
             startt = time.time()
-            progress_bar = tqdm(total=training_batches*num_epochs)
-            progress_bar.update(1)
-            progress_bar.set_description(f"Batch {batch_idx+1+(training_batches*(epoch_count-1))}/{training_batches*num_epochs} Epoch {epoch_count}/{num_epochs} ({(batch_idx+1+(training_batches*(epoch_count-1)))/(training_batches*num_epochs):.2f}%)")
+            print(f"Epoch {epoch_count}/{num_epochs} Batch {batch_idx+1}/{training_batches} ({((batch_idx+1+(training_batches*(epoch_count-1)))/(training_batches*num_epochs))*100:.2f}%)", end='\r', flush=True)
             frames, label = data     
             frame_list = []
+            
+            try:
+                for i in range(batch_size):
+                    for j in range(len(frames)):
+                        frame_list.append(frames[j][i])
+            except IndexError:
+                print(f"IndexError, using remainder batch size at batch {batch_idx}")
+                    
+            frame_initial = []
+            frame_mid = []
+            frame_after = []
+            for i in range(len(frame_list) - 1):
+                if i+2 < len(frame_list) and 0 < ((i+1) % 7) < 6:
+                    frame_initial.append(frame_list[i])
+                    frame_mid.append(frame_list[i+1])
+                    frame_after.append(frame_list[i+2])
+                else:
+                    pass
 
-            for i in range(batch_size):
-                for j in range(7):
-                    frame_list.append(frames[j][i])
-
-            frame_list = torch.stack(frame_list).to(device)      
-            print("Disc")
+            frame_initial = torch.stack(frame_initial).to(device).contiguous()
+            frame_mid = torch.stack(frame_mid).to(device)
+            frame_after = torch.stack(frame_after).to(device).contiguous()
+            frame_list_tensor = torch.stack(frame_list).to(device)
+            frame_pairs = torch.stack((frame_initial, frame_after)).to(device).contiguous()
+            #print(frame_initial.shape, frame_after.shape, frame_pairs.shape)
+            #print("Disc")
             # # # # # # # # # # # # # # # #
             #    Training Discriminator   #
             # # # # # # # # # # # # # # # #
@@ -191,40 +229,51 @@ if __name__ == '__main__':
             optimizer_discriminator.zero_grad()
             
             # All real data
-            print("Disc with real")
-            label = torch.full((batch_size*7,), real_label, dtype=torch.float, device=device)
-            real_output = discriminator(frame_list).view(-1)
+            #print("Disc with real")
+            if (batch_idx+1) % training_batches == 0:
+                label = torch.full((training_remainder*len(frames),), real_label, dtype=torch.float, device=device)
+            else:
+                label = torch.full((batch_size*len(frames),), real_label, dtype=torch.float, device=device)
+            #print(len(label))
+            real_output = discriminator(frame_list_tensor).view(-1)
+            #print(len(real_output))
             d_real_error = BCE_loss(real_output, label)
             d_real_error.backward()
             d_real_mean_pred = real_output.mean().item()
 
             # All fake data
-            print("Disc with fake")
-            label.fill_(fake_label)
-            noise = torch.randn(batch_size*7, latent_dim, 1, 1, device=device)
-            fake_frames = generator(noise)
+            #print("Disc with fake")
+            if (batch_idx+1) % training_batches == 0:
+                label = torch.full((training_remainder*(len(frames)-2),), fake_label, dtype=torch.float, device=device)
+            else:
+                label = torch.full((batch_size*(len(frames)-2),), fake_label, dtype=torch.float, device=device)
+            #noise = torch.randn(batch_size*len(frames), latent_dim, 1, 1, device=device)
+            #fake_frames = generator(noise)
+            fake_frames = generator(frame_pairs[0], frame_pairs[1])
             fake_output = discriminator(fake_frames.detach()).view(-1)
+    
             d_fake_error = BCE_loss(fake_output, label)
             d_fake_error.backward()
             d_fake_mean_pred = fake_output.mean().item()
             
             d_error = d_real_error + d_fake_error
-            print("Optimizing disc parameters")
+            #print("Optimizing disc parameters")
             optimizer_discriminator.step()
-            print("Gen")
+            #print("Gen")
+            
             # # # # # # # # # # # # # #
             #    Training Generator   #
             # # # # # # # # # # # # # #
 
             generator.zero_grad()
             optimizer_generator.zero_grad()
-            print("Gen with fake")
+            #print("Gen with fake")
             label.fill_(real_label) # Generator aims to have its data classified as real
             output = discriminator(fake_frames).view(-1)
             g_error = BCE_loss(output, label)
             g_error.backward()
             g_mean_pred = output.mean().item()
-            print("Optimizing gen parameters")
+            #print("Optimizing gen parameters")
             optimizer_generator.step()
 
             g_losses.append(g_error.item())
@@ -232,22 +281,49 @@ if __name__ == '__main__':
             g_mean_preds.append(g_mean_pred)
             d_fake_mean_preds.append(d_fake_mean_pred)
             d_real_mean_preds.append(d_real_mean_pred)
-            print("Appended results")
+            #print("Appended results")
 
-            if (iteration % 100 == 0) or ((epoch == num_epochs-1) and (i == len(train_data)-1)):
+            if (iteration % 50 == 0) or ((epoch == num_epochs) and (i == len(train_data)-1)):
                 with torch.no_grad():
-                    fake = generator(fixed_noise).detach().cpu()
-                generated_frames.append(vutils.make_grid(fake, padding=2, normalize=True, nrow=8))
+                    fake = generator(frame_pairs[0], frame_pairs[1]).detach().cpu()
+                    try:
+                        os.makedirs(f"generated/{epoch_count}/{batch_idx}")
+                    except:
+                        pass
 
-            iteration += 1
-            print("Loop finished")
+                    for i, image_tensor in enumerate(fake):
+                        image = image_tensor.detach().cpu().numpy()
+                        image = np.transpose(((image * 127.5) - 127.5).astype(np.uint8), (1, 2, 0))
+                        print(image.shape)
+                        cv.imwrite(f"generated/{str(epoch_count)}/{str(batch_idx)}/image_{str(i)}.jpg", image)
+                    mse.append(F.mse_loss(fake.cpu(), frame_mid.cpu()))
+                    psnr.append(psnr_calc(fake.cpu(), frame_mid.cpu()))
+                    l1.append(F.l1_loss(fake.cpu(), frame_mid.cpu()))
+
+                generated_frames.append(vutils.make_grid(fake, padding=2, normalize=True, nrow=4))
+            torch.cuda.empty_cache()
+            
+            if (iteration % 50 == 0) or (iteration % training_batches == 0):
+                torch.save(generator.state_dict(), f'models/generator_{epoch_count}_{batch_idx}.pth')
+                torch.save(discriminator.state_dict(), f'models/discriminator_{epoch_count}_{batch_idx}.pth')
+
+
+            #print("Loop finished")
             endt = time.time()
             dif = endt-startt
-            print(f"{dif} seconds")
+            #print(f"{dif} seconds")
+    loc = {
+        '1': 'vimeo',
+        '2': 'msu'
+    }
+    
+    print("Model trained, saving as .pth files")
 
-    torch.save(generator.state_dict(), f'models/epoch{num_epochs}/batch{batch_size}/lr{learning_rate}/generator_final.pth')
-    torch.save(discriminator.state_dict(), f'models/epoch{num_epochs}/batch{batch_size}/lr{learning_rate}/discriminator_final.pth')
+    save_loc = loc.get(dataset_choice)
+    torch.save(generator.state_dict(), f'models/generator_final.pth')
+    torch.save(discriminator.state_dict(), f'models/discriminator_final.pth')
 
+    print("Plotting model loss graph")
     plt.figure(figsize=(10,5))
     plt.title("Generator and Discriminator Loss During Training")
     plt.plot(g_losses,label="G")
@@ -255,21 +331,89 @@ if __name__ == '__main__':
     plt.xlabel("iterations")
     plt.ylabel("Loss")
     plt.legend()
+    plt.savefig('plots/loss.png', dpi=300, bbox_inches='tight')
     plt.show()
 
+    print("Plotting all mean predictions")
     plt.figure(figsize=(10,5))
-    plt.title("Mean Predictions")
+    plt.title("All Mean Predictions")
     plt.plot(g_mean_preds,label="G")
     plt.plot(d_fake_mean_preds,label="D-Fake")
     plt.plot(d_real_mean_preds,label="D-Real")
     plt.xlabel("iterations")
     plt.ylabel("Probability")
     plt.legend()
+    plt.savefig('plots/preds.png', dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    print("Plotting mean gen predictions")
+    plt.figure(figsize=(10,5))
+    plt.title("G Mean Predictions")
+    plt.plot(g_mean_preds,label="G")
+    plt.xlabel("iterations")
+    plt.ylabel("Probability")
+    plt.legend()
+    plt.savefig('plots/g_preds.png', dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    print("Plotting mean real dis predictions")
+    plt.figure(figsize=(10,5))
+    plt.title("D Real Mean Predictions")
+    plt.plot(d_real_mean_preds,label="D-Real")
+    plt.xlabel("iterations")
+    plt.ylabel("Probability")
+    plt.legend()
+    plt.savefig('plots/d_real_preds.png', dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    print("Plotting mean fake dis predictions")
+    plt.figure(figsize=(10,5))
+    plt.title("D Fake Mean Predictions")
+    plt.plot(d_fake_mean_preds,label="D-Fake")
+    plt.xlabel("iterations")
+    plt.ylabel("Probability")
+    plt.legend()
+    plt.savefig('plots/d_fake_preds.png', dpi=300, bbox_inches='tight')
     plt.show()
 
-    fig = plt.figure(figsize=(8,8))
-    plt.axis("off")
-    images = [[plt.imshow(np.transpose(i,(1,2,0)), animated=True)] for i in generated_frames]
-    animated_frames = animation.ArtistAnimation(fig, images, interval=1000, repeat_delay=1000, blit=True)
+    print("Plotting mse-loss")
+    plt.figure(figsize=(10,5))
+    plt.title("MSE-Loss")
+    plt.plot(mse)
+    plt.xlabel("iterations")
+    plt.ylabel("MSE-Loss")
+    plt.legend()
+    plt.savefig('plots/mse.png', dpi=300, bbox_inches='tight')
     plt.show()
 
+    print("Plotting psnr-loss")
+    plt.figure(figsize=(10,5))
+    plt.title("PSNR-Loss")
+    plt.plot(psnr)
+    plt.xlabel("iterations")
+    plt.ylabel("PSNR-Loss")
+    plt.legend()
+    plt.savefig('plots/psnr.png', dpi=300, bbox_inches='tight')
+    plt.show()
+
+    print("Plotting l1-loss")
+    plt.figure(figsize=(10,5))
+    plt.title("L1-Loss")
+    plt.plot(l1)
+    plt.xlabel("iterations")
+    plt.ylabel("L1-Loss")
+    plt.legend()
+    plt.savefig('plots/l1.png', dpi=300, bbox_inches='tight')
+    plt.show()
+
+    print("Plotting generated frames")
+    for i in range(len(generated_frames)):
+        plt.figure(figsize=(8,8))
+        plt.title(f"Set {i+1} of Generated Frames")
+        plt.axis("off")
+        plt.imshow(generated_frames[i].permute(1, 2, 0).numpy())
+        plt.savefig(f'plots/generated{i+1}.png', dpi=300, bbox_inches='tight')
+        plt.show()
+        print(f"Plotted {i+1}/{len(generated_frames)} ({((i+1)/(len(generated_frames))*100):.2f}%)", end='\r', flush=True)
+
+    print("\nFinished script")
