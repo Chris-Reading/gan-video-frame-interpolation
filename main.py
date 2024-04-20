@@ -1,7 +1,7 @@
 """
 Title: Generative Adversarial Network - Video Frame Interpolation (GAN-VFI)
 Author: Chris McDonald
-Date: March 24, 2024
+Date: March 23, 2024
 
 Description:
 This is the main script for the first project aim, focusing on generating features and patterns from the dataset images.
