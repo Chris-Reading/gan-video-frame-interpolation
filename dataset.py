@@ -22,7 +22,7 @@ class VimeoDataset(Dataset):
 
     def __getitem__(self, idx):
         sequence_path = os.path.join(self.root_dir, 'sequences', self.file_paths[idx])
-
+        # Loads all frames from the path as pillow images
         frame1path = os.path.join(sequence_path, 'im1.png')
         frame2path = os.path.join(sequence_path, 'im2.png')
         frame3path = os.path.join(sequence_path, 'im3.png')
@@ -39,6 +39,7 @@ class VimeoDataset(Dataset):
         frame6 = Image.open(frame6path)
         frame7 = Image.open(frame7path)
 
+        # Pads them to a square shape and normalizes the pixel values
         width, height = 448, 256
         left_pad = (512 - width) // 2
         right_pad = 512 - width - left_pad
