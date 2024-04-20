@@ -4,40 +4,38 @@ class VimeoDiscriminator2(nn.Module):
 
     def __init__(self):
         super(VimeoDiscriminator2, self).__init__()
-        self.nfg = 32  # the size of feature map
-        self.c = 3
+        self.feature_groups = 32  # the size of feature map
+        self.channels = 3 # target channels (rgb)
         
         self.conv_blocks = nn.Sequential(
-            # input is c * 64 * 64
-            nn.Conv2d(self.c, self.nfg, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.Conv2d(self.channels, self.feature_groups, kernel_size=4, stride=2, padding=1, bias=False), # increases number of channels from 3 to 32
+            nn.LeakyReLU(0.2, inplace=True), # allows small negative inputs through
+            nn.Dropout2d(0.15), # randomly drops out a proportion of inputs to prevent overfitting
+            nn.Conv2d(self.feature_groups, self.feature_groups * 2, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(self.feature_groups * 2),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Dropout2d(0.15),
-            # state: nfg * 32 * 32
-            nn.Conv2d(self.nfg, self.nfg * 2, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(self.nfg * 2),
+            nn.Conv2d(self.feature_groups * 2, self.feature_groups * 4, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(self.feature_groups * 4),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Dropout2d(0.15),
-            nn.Conv2d(self.nfg * 2, self.nfg * 4, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(self.nfg * 4),
+            nn.Conv2d(self.feature_groups * 4, self.feature_groups * 8, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(self.feature_groups * 8),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Dropout2d(0.15),
-            nn.Conv2d(self.nfg * 4, self.nfg * 8, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(self.nfg * 8),
+            nn.Conv2d(self.feature_groups * 8, self.feature_groups * 16, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(self.feature_groups * 16),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Dropout2d(0.15),
-            nn.Conv2d(self.nfg * 8, self.nfg * 16, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(self.nfg * 16),
+            nn.Conv2d(self.feature_groups * 16, self.feature_groups * 32, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(self.feature_groups * 32),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Dropout2d(0.15),
-            nn.Conv2d(self.nfg * 16, self.nfg * 32, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(self.nfg * 32),
+            nn.Conv2d(self.feature_groups * 32, self.feature_groups * 64, kernel_size=4, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(self.feature_groups * 64),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Dropout2d(0.15),
-            nn.Conv2d(self.nfg * 32, self.nfg * 64, kernel_size=4, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(self.nfg * 64),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Dropout2d(0.15),
-            nn.Conv2d(self.nfg * 64, 1, kernel_size=4, stride=1, padding=0, bias=False)
+            nn.Conv2d(self.feature_groups * 64, 1, kernel_size=4, stride=1, padding=0, bias=False) # decreases channels to 1 (for a singular probability)
             )
     
     def forward(self, data):
@@ -60,7 +58,7 @@ class Discriminator2DVimeo(nn.Module):
             self._block(features_d*32, features_d*64, 4, 2, 1), #256
 
             nn.Conv2d(features_d*64, 1, kernel_size=4, stride=2, padding=0), #64
-            nn.Sigmoid()
+            nn.Sigmoid() # changes output to a singular classifier between 0 and 1 (a probability in this case)
         )
 
     def _block(self, in_channels, out_channels, kernel_size, stride, padding):
@@ -73,7 +71,7 @@ class Discriminator2DVimeo(nn.Module):
                 padding,
                 bias=False
             ),
-            nn.BatchNorm2d(out_channels),
+            nn.BatchNorm2d(out_channels), # normalizes activations using stdev and mean
             nn.LeakyReLU(0.2)
         )
     
