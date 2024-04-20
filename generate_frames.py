@@ -13,6 +13,7 @@ from sklearn.metrics import mean_squared_error
 import cv2 as cv
 
 def Generate(generator, device):
+    # Loads data
     train_dataset = VimeoDataset(root_dir='src\\vimeo_septuplet')
     train_data = DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=2)
         
@@ -26,7 +27,7 @@ def Generate(generator, device):
                 frame_list.append(frames[j][i])
     except IndexError:
         print(f"IndexError, use remainder batch size at batch {1}")
-
+    # Splits sequences into different lists
     frame_initial = []
     frame_after = []
     
@@ -46,7 +47,7 @@ def Generate(generator, device):
         print(frame_after.shape)
         print(frame_list_tensor.shape)
 
-        fake_frames = (generator(frame_pairs[0], frame_pairs[1]))
+        fake_frames = (generator(frame_pairs[0], frame_pairs[1])) # generates intermediate frames between frame pairs
         print(fake_frames.shape)
         print(fake_frames[0].shape)
         fake_list = [fake_frames[0], fake_frames[1], fake_frames[2], fake_frames[3], fake_frames[4], fake_frames[5]]
@@ -60,11 +61,12 @@ def Generate(generator, device):
             try:
                 mse = mean_squared_error(fake_list[i].flatten(), fake_list[i+1].flatten())
                 print(mse)
+                # Evaluates the model
             except:
                 pass
 
         sequence_path = os.path.join('src\\vimeo_septuplet', 'sequences', label[0])
-
+        # Loads images as pillow objects
         frame1 = Image.open(os.path.join(sequence_path, 'im1.png'))
         frame2 = Image.open(os.path.join(sequence_path, 'im2.png'))
         frame3 = Image.open(os.path.join(sequence_path, 'im3.png'))
@@ -73,10 +75,10 @@ def Generate(generator, device):
         frame6 = Image.open(os.path.join(sequence_path, 'im6.png'))
         frame7 = Image.open(os.path.join(sequence_path, 'im7.png'))
 
-        f = [frame1, frame2, frame3, frame4, frame5, frame6, frame7]
+        f = [frame1, frame2, frame3, frame4, frame5, frame6, frame7] # Original images
         for i in range(len(fake_list)):
             fake_list[i] = Image.fromarray(fake_list[i].astype(np.uint8))
-        ff = [frame1, fake_list[0], frame2, fake_list[1], frame3, fake_list[2], frame4, fake_list[3], frame5, fake_list[4], frame6, fake_list[5], frame7]
+        ff = [frame1, fake_list[0], frame2, fake_list[1], frame3, fake_list[2], frame4, fake_list[3], frame5, fake_list[4], frame6, fake_list[5], frame7] # With additional frames
 
         return f, ff
 
