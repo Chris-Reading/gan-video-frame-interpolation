@@ -15,66 +15,69 @@ from dataset import VimeoDataset
 
 config = configparser.ConfigParser()
 
-config.read('params.ini')
+try:
+    config.read('params.ini')
 
-generator_layers = int(config['generator']['generator_layers'])
-generator_core_layer = config['generator']['generator_core_layer']
-generator_norm_layer = config['generator']['generator_norm_layer']
-generator_activation_layer = config['generator']['generator_activation_layer']
-genLSTM = bool(config['generator']['genLSTM'])
-genLSTMBias = bool(config['generator']['genLSTMBias'])
-genLSTMBi = bool(config['generator']['genLSTMBi'])
-genLSTMDrop = float(config['generator']['genLSTMDrop'])
-genBias = bool(config['generator']['genBias'])
-genNormEps = float(config['generator']['genNormEps'])
-genNormAffine = bool(config['generator']['genNormAffine'])
-genDropout = bool(config['generator']['genDropout'])
-genActivationInplace = bool(config['generator']['genActivationInplace'])
-genActivationNegativeSlope = float(config['generator']['genActivationNegativeSlope'])
-genActivationAlpha = float(config['generator']['genActivationAlpha'])
-genKernelSize = int(config['generator']['genKernelSize'])
-genStrideSize = int(config['generator']['genStrideSize'])
-genPaddingSize = int(config['generator']['genPaddingSize'])
-
-
-discriminator_layers = int(config['discriminator']['discriminator_layers'])
-discriminator_core_layer = config['discriminator']['discriminator_core_layer']
-discriminator_norm_layer = config['discriminator']['discriminator_norm_layer']
-discriminator_activation_layer = config['discriminator']['discriminator_activation_layer']
-disLSTM = bool(config['discriminator']['disLSTM'])
-disLSTMBias = bool(config['discriminator']['disLSTMBias'])
-disLSTMBi = bool(config['discriminator']['disLSTMBi'])
-disLSTMDrop = float(config['discriminator']['disLSTMDrop'])
-disBias = bool(config['discriminator']['disBias'])
-disNormEps = float(config['discriminator']['disNormEps'])
-disNormAffine = bool(config['discriminator']['disNormAffine'])
-disDropout = bool(config['discriminator']['disDropout'])
-disActivationInplace = bool(config['discriminator']['disActivationInplace'])
-disActivationNegativeSlope = float(config['discriminator']['disActivationNegativeSlope'])
-disActivationAlpha = float(config['discriminator']['disActivationAlpha'])
-disKernelSize = int(config['discriminator']['disKernelSize'])
-disStrideSize = int(config['discriminator']['disStrideSize'])
-disPaddingSize = int(config['discriminator']['disPaddingSize'])
+    generator_layers = int(config['generator']['generator_layers'])
+    generator_core_layer = config['generator']['generator_core_layer']
+    generator_norm_layer = config['generator']['generator_norm_layer']
+    generator_activation_layer = config['generator']['generator_activation_layer']
+    genLSTM = bool(config['generator']['genLSTM'])
+    genLSTMBias = bool(config['generator']['genLSTMBias'])
+    genLSTMBi = bool(config['generator']['genLSTMBi'])
+    genLSTMDrop = float(config['generator']['genLSTMDrop'])
+    genBias = bool(config['generator']['genBias'])
+    genNormEps = float(config['generator']['genNormEps'])
+    genNormAffine = bool(config['generator']['genNormAffine'])
+    genDropout = bool(config['generator']['genDropout'])
+    genActivationInplace = bool(config['generator']['genActivationInplace'])
+    genActivationNegativeSlope = float(config['generator']['genActivationNegativeSlope'])
+    genActivationAlpha = float(config['generator']['genActivationAlpha'])
+    genKernelSize = int(config['generator']['genKernelSize'])
+    genStrideSize = int(config['generator']['genStrideSize'])
+    genPaddingSize = int(config['generator']['genPaddingSize'])
 
 
-seed = int(config['training']['seed'])
-deterministic_algorithms = bool(config['training']['deterministic_algorithms'])
-batch_size = int(config['training']['batch_size'])
-latent_dim = int(config['training']['latent_dim'])
-epochs = int(config['training']['epochs'])
-threads = int(config['training']['threads'])
-loss_function = config['training']['loss_function']
-optimizer = config['training']['optimizer']
-lr = float(config['training']['lr'])
-beta1 = float(config['training']['beta1'])
-beta2 = float(config['training']['beta2'])
-save_generated_frames = bool(config['training']['save_generated_frames'])
-batches_per_frame_save = int(config['training']['batches_per_frame_save'])
-model_save_type = config['training']['model_save_type']
-model_save_count = int(config['training']['model_save_count'])
-plot_loss = bool(config['training']['plot_loss'])
-plot_preds = bool(config['training']['plot_preds'])
-plot_frames = bool(config['training']['plot_frames'])
+    discriminator_layers = int(config['discriminator']['discriminator_layers'])
+    discriminator_core_layer = config['discriminator']['discriminator_core_layer']
+    discriminator_norm_layer = config['discriminator']['discriminator_norm_layer']
+    discriminator_activation_layer = config['discriminator']['discriminator_activation_layer']
+    disLSTM = bool(config['discriminator']['disLSTM'])
+    disLSTMBias = bool(config['discriminator']['disLSTMBias'])
+    disLSTMBi = bool(config['discriminator']['disLSTMBi'])
+    disLSTMDrop = float(config['discriminator']['disLSTMDrop'])
+    disBias = bool(config['discriminator']['disBias'])
+    disNormEps = float(config['discriminator']['disNormEps'])
+    disNormAffine = bool(config['discriminator']['disNormAffine'])
+    disDropout = bool(config['discriminator']['disDropout'])
+    disActivationInplace = bool(config['discriminator']['disActivationInplace'])
+    disActivationNegativeSlope = float(config['discriminator']['disActivationNegativeSlope'])
+    disActivationAlpha = float(config['discriminator']['disActivationAlpha'])
+    disKernelSize = int(config['discriminator']['disKernelSize'])
+    disStrideSize = int(config['discriminator']['disStrideSize'])
+    disPaddingSize = int(config['discriminator']['disPaddingSize'])
+
+
+    seed = int(config['training']['seed'])
+    deterministic_algorithms = bool(config['training']['deterministic_algorithms'])
+    batch_size = int(config['training']['batch_size'])
+    latent_dim = int(config['training']['latent_dim'])
+    epochs = int(config['training']['epochs'])
+    threads = int(config['training']['threads'])
+    loss_function = config['training']['loss_function']
+    optimizer = config['training']['optimizer']
+    lr = float(config['training']['lr'])
+    beta1 = float(config['training']['beta1'])
+    beta2 = float(config['training']['beta2'])
+    save_generated_frames = bool(config['training']['save_generated_frames'])
+    batches_per_frame_save = int(config['training']['batches_per_frame_save'])
+    model_save_type = config['training']['model_save_type']
+    model_save_count = int(config['training']['model_save_count'])
+    plot_loss = bool(config['training']['plot_loss'])
+    plot_preds = bool(config['training']['plot_preds'])
+    plot_frames = bool(config['training']['plot_frames'])
+except:
+    pass
 
 
 #print(generator_layers, generator_core_layer, generator_norm_layer, generator_activation_layer, genLSTM, genLSTMBias)
@@ -145,57 +148,52 @@ class Discriminator(nn.Module):
 class Generator(nn.Module):
     def __init__(self):
         super(Generator, self).__init__()
-        self.feature_groups = 32
-        self.channels = 3
+        self.feature_groups = 32 # size of the feature map
+        self.channels = 3 # target channels (rgb)
+        layers_up = [] # list for upscaling the tensor
+        layers_down = [] # list for downscaling the tensor
 
-        layers_up = []
-        layers_down = []
-
-        if generator_core_layer == "Convolutional Layer":
-            layers_down.append(nn.Conv2d(self.channels*2, self.feature_groups*2, kernel_size=genKernelSize, stride=genStrideSize, padding=genPaddingSize, bias=genBias))
+        if generator_core_layer == "Convolutional Layer": # generator_core_layer is variable from the GUI
+            layers_down.append(nn.Conv2d(self.channels*2, self.feature_groups*2, kernel_size=genKernelSize, stride=genStrideSize, padding=genPaddingSize, bias=genBias)) # increases number of channels by 2
         elif generator_core_layer == "Dense Layer":
-            layers_down.append(nn.Linear(self.channels*2, self.feature_groups*2))
+            layers_down.append(nn.Linear(self.channels*2, self.feature_groups*2)) # alternative layer to increase channels by 2
+        if generator_norm_layer == "Batch": # generator_norm_layer is variable from the GUI
+            layers_down.append(nn.BatchNorm2d(self.feature_groups*2, eps=disNormEps, affine=disNormAffine)) # normalizes activations using stdev and mean
+        elif generator_norm_layer == "Instance":
+            layers_down.append(nn.InstanceNorm2d(self.feature_groups*2, eps=disNormEps, affine=disNormAffine)) # alternative layer to normalize activations
+        if generator_activation_layer == "ReLU": # generator_activation_layer is variable from the GUI
+            layers_down.append(nn.ReLU(inplace=genActivationInplace)) # prevents any negative inputs going through
+        elif generator_activation_layer == "LeakyReLU":
+            layers_down.append(nn.LeakyReLU(negative_slope=genActivationNegativeSlope, inplace=genActivationInplace)) # allows small negative inputs through
+        elif generator_activation_layer == "ELU":
+            layers_down.append(nn.ELU(alpha=genActivationAlpha, inplace=genActivationInplace)) # allows small negative inputs through based on alpha parameter
+        elif generator_activation_layer == "Softplus":
+            layers_down.append(nn.Softplus()) # forces values to be positive
 
-        if discriminator_norm_layer == "Batch":
-            layers_down.append(nn.BatchNorm2d(self.feature_groups*2, eps=disNormEps, affine=disNormAffine))
-        elif discriminator_norm_layer == "Instance":
-            layers_down.append(nn.InstanceNorm2d(self.feature_groups*2, eps=disNormEps, affine=disNormAffine))
-            
-        if generator_activation_layer == "ReLU":
-            layers_down.append(nn.ReLU(inplace=genActivationInplace))
-        elif discriminator_activation_layer == "LeakyReLU":
-            layers_down.append(nn.LeakyReLU(negative_slope=genActivationNegativeSlope, inplace=genActivationInplace))
-        elif discriminator_activation_layer == "ELU":
-            layers_down.append(nn.ELU(alpha=genActivationAlpha, inplace=genActivationInplace))
-        elif discriminator_activation_layer == "Softplus":
-            layers_down.append(nn.Softplus())
-
-        for i in range(generator_layers):
+        for i in range(generator_layers): # generator_layers is variable from the GUI
             j = 10-1-i
             if generator_core_layer == "Convolution Layer":
                 layers_down.append(nn.Conv2d(self.feature_groups*(2**(i)), self.feature_groups*(2**(i+1)), kernel_size=genKernelSize, stride=genStrideSize, padding=genPaddingSize, bias=genBias))
-                layers_up.append(nn.ConvTranspose2d(self.feature_groups*(2**(j)), self.feature_groups*(2**(j-1)), kernel_size=genKernelSize, stride=genStrideSize, padding=genPaddingSize, bias=genBias))
+                layers_up.append(nn.ConvTranspose2d(self.feature_groups*(2**(j)), self.feature_groups*(2**(j-1)), kernel_size=genKernelSize, stride=genStrideSize, padding=genPaddingSize, bias=genBias)) # decreases number of channels by 2
             elif generator_core_layer == "Dense Layer":
                 layers_down.append(nn.Linear(self.feature_groups*(2**(i)), self.feature_groups*(2**(i+1))))
                 layers_up.append(nn.Linear(self.feature_groups*(2**(j)), self.feature_groups*(2**(j-1))))
-
-            if discriminator_norm_layer == "Batch":
+            if generator_norm_layer == "Batch":
                 layers_down.append(nn.BatchNorm2d(self.feature_groups*(2**(i+1)), eps=disNormEps, affine=disNormAffine))
                 layers_up.append(nn.BatchNorm2d(self.feature_groups*(2**(j-1)), eps=disNormEps, affine=disNormAffine))
-            elif discriminator_norm_layer == "Instance":
+            elif generator_norm_layer == "Instance":
                 layers_down.append(nn.InstanceNorm2d(self.feature_groups*(2**(i+1)), eps=disNormEps, affine=disNormAffine))
                 layers_up.append(nn.InstanceNorm2d(self.feature_groups*(2**(j-1)), eps=disNormEps, affine=disNormAffine))
-
             if generator_activation_layer == "ReLU":
                 layers_down.append(nn.ReLU(inplace=genActivationInplace))
                 layers_up.append(nn.ReLU(inplace=genActivationInplace))
-            elif discriminator_activation_layer == "LeakyReLU":
+            elif generator_activation_layer == "LeakyReLU":
                 layers_down.append(nn.LeakyReLU(negative_slope=genActivationNegativeSlope, inplace=genActivationInplace))
                 layers_up.append(nn.LeakyReLU(negative_slope=genActivationNegativeSlope, inplace=genActivationInplace))
-            elif discriminator_activation_layer == "ELU":
+            elif generator_activation_layer == "ELU":
                 layers_down.append(nn.ELU(alpha=genActivationAlpha, inplace=genActivationInplace))
                 layers_up.append(nn.ELU(alpha=genActivationAlpha, inplace=genActivationInplace))
-            elif discriminator_activation_layer == "Softplus":
+            elif generator_activation_layer == "Softplus":
                 layers_down.append(nn.Softplus())        
                 layers_up.append(nn.Softplus())  
 
@@ -203,19 +201,14 @@ class Generator(nn.Module):
             layers_up.append(nn.Conv2d(self.feature_groups, self.channels, kernel_size=genKernelSize, stride=genStrideSize, padding=genPaddingSize, bias=genBias))
         elif generator_core_layer == "Dense Layer":
             layers_up.append(nn.Linear(self.feature_groups, self.channels))
-
-        layers_up.append(nn.Tanh())  
-
-        self.down_sample_blocks = nn.Sequential(*layers_down)
+        layers_up.append(nn.Tanh()) # forces values between the range -1 and 1
+        self.down_sample_blocks = nn.Sequential(*layers_down) # stacks neural network layers
         self.up_sample_blocks = nn.Sequential(*layers_up)
 
     def forward(self, tensor0, tensor2):
-
-        out = torch.cat((tensor0, tensor2), 1)
-        out_down = self.down_sample_blocks(out)
-        out_up = self.up_sample_blocks(out_down)
-
-        return out_up
+        inTensor = torch.cat((tensor0, tensor2), 1) # combines 2 tensor frames along the channel dimension
+        outTensor = self.up_sample_blocks(self.down_sample_blocks(inTensor)) # applies the generators layers to the tensor
+        return outTensor
     
 def start():
     training_batches = int()
