@@ -4,7 +4,7 @@ Author: Chris McDonald
 Date: March 24, 2024
 
 Description:
-This is the main script for the GAN-VFI Project, all other scripts will be called from here.
+This is the main script for the first project aim, focusing on generating features and patterns from the dataset images.
 It controls video dataset loading, both (generator & discriminator) of the neural networks, and the training cycle.
 
 Usage:
@@ -13,8 +13,6 @@ Make sure python is installed along with the necessary libraries.
 
 Notes:
 This file connects multiple python scripts to train the GAN on a local copy of the Vimeo90k dataset:
-dataset_statistics.py   - Calculates the mean and standard deviation of the pixels in the dataset, separated by channels (RGB).
-dataset_test.py         - Tests if the dataset is properly loaded by plotting each set of frames into a figure.
 dataset.py              - Defines the VimeoDataset Class which is used to load the dataset into a variable. All pixels are normalized
                         in the range [-1,1] by subtracting 127.5 and then dividing by 127.5
 discriminator.py        - Defines the discriminator neural network for the (DCGAN) implementation. Condenses the multi-dimensional dataset into a single channel 
@@ -24,23 +22,21 @@ format_time.py          - Takes an input of the start and end time of the sectio
 generator.py            - Defines the generator neural network for the DCGAN implementation. Transforming random noise into meaningful data, attempting to match the dataset.
 """
 
-import torch                                # PyTorch library - Used for tensors and neural networks in the deep learning model.
-from torch.utils.data import DataLoader     # DataLoader class of torch.utils.data module - Used for loading dataset into batches.
-from torchvision import transforms          # Transforms module of torchvision library - Used for transformation functions applied to images.
-import torch.nn as nn                       # Neural network module of of torch library - Used for defining weights of each layer of the models.
-import numpy as np                          # Numpy library - Used for creating and modifying matrices of various dimensions.
-import random                               # random library - Used for setting the seed in order to have reproducable code.
-import torch.optim as optim                 # optim module of torch library - Used for defining the optimizers which train the neural networks.
-import time                                 # time library - Used for calculating the duration of various sections of the script.
-import math                                 # math library - Used for calculating values for visualization e.g. Number of batches based on dataset and batch sizes.
-import matplotlib.pyplot as plt
-import torchvision.utils as vutils
-import matplotlib.animation as animation
-import os
-from PIL import Image
-import torch.nn.functional as F
-from torchmetrics.image import PeakSignalNoiseRatio
-import cv2 as cv
+import torch                                            # PyTorch library - Used for tensors and neural networks in the deep learning model.
+from torch.utils.data import DataLoader                 # DataLoader class of torch.utils.data module - Used for loading dataset into batches.
+from torchvision import transforms                      # Transforms module of torchvision library - Used for transformation functions applied to images.
+import torch.nn as nn                                   # Neural network module of of torch library - Used for defining weights of each layer of the models.
+import numpy as np                                      # Numpy library - Used for creating and modifying matrices of various dimensions.
+import random                                           # random library - Used for setting the seed in order to have reproducable code.
+import torch.optim as optim                             # optim module of torch library - Used for defining the optimizers which train the neural networks.
+import time                                             # time library - Used for calculating the duration of various sections of the script.
+import math                                             # math library - Used for calculating values for visualization e.g. Number of batches based on dataset and batch sizes.
+import matplotlib.pyplot as plt                         # pyplot module of matplotlib library - Used for plotting figures on graphs and tables.
+import torchvision.utils as vutils                      # utils module of torchvision library - Used for stacking tensors into plottable images.
+import os                                               # ps library - Used for file paths.
+import torch.nn.functional as F                         # functional method of torch.nn module - Used for loss functions and nn layers.
+from torchmetrics.image import PeakSignalNoiseRatio     # PeakSignalNoiseRatio method of torchmetrics.image module - Used for loss function.
+import cv2 as cv                                        # cv2 library - Used for saving jpg images.
 
 # Importing other scripts
 from dataset import VimeoDataset, MSUDataset                                # VimeoDataset class from dataset.py
@@ -64,8 +60,8 @@ torch.manual_seed(manualSeed)
 torch.use_deterministic_algorithms(True)
 
 # Hyperparameters
-batch_size = 16             # Number of videos per "batch"
-latent_dim = 100            # 
+batch_size = 16             
+latent_dim = 100             
 learning_rate = 0.0002
 beta1 = 0.5
 beta2 = 0.999
@@ -88,14 +84,11 @@ dataset_standard_deviation = [0.20665579, 0.19933419, 0.19278685]
 
 # Creating DataLoaders for training and testing
 
-#dataset_choice = int(input("Dataset Vimeo (1) or MSU (2): "))
-dataset_choice = 1
-if dataset_choice == 1:
-    train_dataset = VimeoDataset(root_dir='src/vimeo_septuplet', split='train')
-    train_data = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=worker_threads)
-    N, in_channels, height, width = 7, 3, 512, 512
-    fixed_noise_1 = torch.randn(16, 3, 512, 512, device=device) # Creates 64 noise vectors with 100 dimensions
-    fixed_noise_2 = torch.randn(16, 3, 512, 512, device=device) # Creates 64 noise vectors with 100 dimensions
+train_dataset = VimeoDataset(root_dir='src/vimeo_septuplet', split='train')
+train_data = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=worker_threads)
+N, in_channels, height, width = 7, 3, 512, 512
+fixed_noise_1 = torch.randn(16, 3, 512, 512, device=device) # Creates 64 noise vectors with 100 dimensions
+fixed_noise_2 = torch.randn(16, 3, 512, 512, device=device) # Creates 64 noise vectors with 100 dimensions
 
 training_batches = math.ceil(len(train_dataset) / batch_size)
 training_remainder = len(train_dataset) % batch_size
@@ -104,10 +97,11 @@ training_remainder = len(train_dataset) % batch_size
 #test_dataset = VimeoDataset(root_dir='/notebooks/src/vimeo_septuplet', split='test')
 #test_data = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, num_workers=worker_threads)
 
-# Initialize components
+# Initialize neural networks
 generator = Generator().to(device)
 discriminator = Discriminator().to(device)
 
+# Run parallel if multiple gpus available
 if torch.cuda.device_count() > 1:
     generator = nn.DataParallel(generator)
     discriminator = nn.DataParallel(discriminator)
@@ -118,6 +112,7 @@ if isinstance(generator, nn.DataParallel):
 if isinstance(discriminator, nn.DataParallel):
     print("Discriminator is wrapped with DataParallel")
 
+# Set hyperparameters for neural network layers
 def initialize_weights(models):
     for model in models:
         for m in model.modules():
@@ -142,10 +137,8 @@ discriminator.apply(weights_init)
 
 # Loss functions
 BCE_loss = nn.BCEWithLogitsLoss()
-#adversarial_loss = nn.BCELoss()
-#temporal_loss = nn.MSELoss()
-#depth_loss = nn.MSELoss()
 
+# Labels for calculating loss
 real_label = 1.0
 fake_label = 0.0
 
@@ -154,7 +147,6 @@ optimizer_generator = optim.Adam(generator.parameters(), lr=learning_rate, betas
 optimizer_discriminator = optim.Adam(discriminator.parameters(), lr=learning_rate, betas=(beta1, beta2), weight_decay=learning_rate/num_epochs)
 
 # Analyzing preprocessing
-
 if __name__ == '__main__':
     test_batch = next(iter(train_data))
     plt.axis("off")
@@ -167,11 +159,12 @@ if __name__ == '__main__':
             frame_list.append(frames[j][i])
 
     print(len(frame_list)/len(frames), len(frame_list)/batch_size, len(frame_list))
-
+    # Save plot of a random batch from dataset
     plt.imshow(np.transpose(vutils.make_grid(frame_list, padding=1, normalize=True, nrow=14).cpu(),(1,2,0)))
     plt.savefig('plots/random_batch.png', dpi=300, bbox_inches='tight')
     plt.show()
 
+    # Variables for training loop logic
     generated_frames = []
     g_losses = []
     g_mean_preds = []
@@ -191,7 +184,6 @@ if __name__ == '__main__':
         epoch_count += 1
         for batch_idx, data in enumerate(train_data):
             iteration += 1
-            startt = time.time()
             print(f"Epoch {epoch_count}/{num_epochs} Batch {batch_idx+1}/{training_batches} ({((batch_idx+1+(training_batches*(epoch_count-1)))/(training_batches*num_epochs))*100:.2f}%)", end='\r', flush=True)
             frames, label = data     
             frame_list = []
@@ -199,7 +191,7 @@ if __name__ == '__main__':
             try:
                 for i in range(batch_size):
                     for j in range(len(frames)):
-                        frame_list.append(frames[j][i])
+                        frame_list.append(frames[j][i]) # every frame in the batch
             except IndexError:
                 print(f"IndexError, using remainder batch size at batch {batch_idx}")
                     
@@ -214,7 +206,7 @@ if __name__ == '__main__':
                 else:
                     pass
 
-            frame_initial = torch.stack(frame_initial).to(device).contiguous()
+            frame_initial = torch.stack(frame_initial).to(device).contiguous() # Contiguous keeps the code from breaking while running on parallel
             frame_mid = torch.stack(frame_mid).to(device)
             frame_after = torch.stack(frame_after).to(device).contiguous()
             frame_list_tensor = torch.stack(frame_list).to(device)
@@ -225,21 +217,21 @@ if __name__ == '__main__':
             #    Training Discriminator   #
             # # # # # # # # # # # # # # # #
 
-            discriminator.zero_grad()
+            discriminator.zero_grad() # Resets gradient from previous loop, so only the current loop updates the weights and biases
             optimizer_discriminator.zero_grad()
             
             # All real data
             #print("Disc with real")
             if (batch_idx+1) % training_batches == 0:
-                label = torch.full((training_remainder*len(frames),), real_label, dtype=torch.float, device=device)
+                label = torch.full((training_remainder*len(frames),), real_label, dtype=torch.float, device=device) # Fake data filled with real_label
             else:
                 label = torch.full((batch_size*len(frames),), real_label, dtype=torch.float, device=device)
             #print(len(label))
-            real_output = discriminator(frame_list_tensor).view(-1)
+            real_output = discriminator(frame_list_tensor).view(-1) # Sends tensors from the dataset through the discriminator
             #print(len(real_output))
-            d_real_error = BCE_loss(real_output, label)
-            d_real_error.backward()
-            d_real_mean_pred = real_output.mean().item()
+            d_real_error = BCE_loss(real_output, label) # Calculates how correct it was labelled
+            d_real_error.backward() # Calculates with respect to model parameters
+            d_real_mean_pred = real_output.mean().item() # For plotting predictions
 
             # All fake data
             #print("Disc with fake")
@@ -249,16 +241,16 @@ if __name__ == '__main__':
                 label = torch.full((batch_size*(len(frames)-2),), fake_label, dtype=torch.float, device=device)
             #noise = torch.randn(batch_size*len(frames), latent_dim, 1, 1, device=device)
             #fake_frames = generator(noise)
-            fake_frames = generator(frame_pairs[0], frame_pairs[1])
-            fake_output = discriminator(fake_frames.detach()).view(-1)
+            fake_frames = generator(frame_pairs[0], frame_pairs[1]) # Sends consecutive frame pairs through the generator
+            fake_output = discriminator(fake_frames.detach()).view(-1) # Detached so gradients don't flow through to the generator
     
             d_fake_error = BCE_loss(fake_output, label)
             d_fake_error.backward()
             d_fake_mean_pred = fake_output.mean().item()
             
-            d_error = d_real_error + d_fake_error
+            d_error = d_real_error + d_fake_error # Total discriminator error
             #print("Optimizing disc parameters")
-            optimizer_discriminator.step()
+            optimizer_discriminator.step() # Update optimizer parameters
             #print("Gen")
             
             # # # # # # # # # # # # # #
@@ -276,6 +268,7 @@ if __name__ == '__main__':
             #print("Optimizing gen parameters")
             optimizer_generator.step()
 
+            # Add plot values to lists
             g_losses.append(g_error.item())
             d_losses.append(d_error.item())
             g_mean_preds.append(g_mean_pred)
@@ -283,46 +276,37 @@ if __name__ == '__main__':
             d_real_mean_preds.append(d_real_mean_pred)
             #print("Appended results")
 
-            if (iteration % 50 == 0) or ((epoch == num_epochs) and (i == len(train_data)-1)):
+            if (iteration % 50 == 0) or ((epoch == num_epochs) and (i == len(train_data)-1)): # Every 50 iterations
                 with torch.no_grad():
-                    fake = generator(frame_pairs[0], frame_pairs[1]).detach().cpu()
+                    fake = generator(frame_pairs[0], frame_pairs[1]).detach().cpu() # No gradients and moves output to cpu for plotting
                     try:
                         os.makedirs(f"generated/{epoch_count}/{batch_idx}")
                     except:
                         pass
 
                     for i, image_tensor in enumerate(fake):
-                        image = image_tensor.detach().cpu().numpy()
-                        image = np.transpose(((image * 127.5) - 127.5).astype(np.uint8), (1, 2, 0))
+                        image = image_tensor.detach().cpu().numpy() # Tensor to numpy array
+                        image = np.transpose(((image * 127.5) - 127.5).astype(np.uint8), (1, 2, 0)) # Reverse normalization
                         print(image.shape)
                         cv.imwrite(f"generated/{str(epoch_count)}/{str(batch_idx)}/image_{str(i)}.jpg", image)
+                    # Add loss values to lists
                     mse.append(F.mse_loss(fake.cpu(), frame_mid.cpu()))
                     psnr.append(psnr_calc(fake.cpu(), frame_mid.cpu()))
                     l1.append(F.l1_loss(fake.cpu(), frame_mid.cpu()))
-
+                # Grid of generated images
                 generated_frames.append(vutils.make_grid(fake, padding=2, normalize=True, nrow=4))
-            torch.cuda.empty_cache()
+            torch.cuda.empty_cache() # Empty cache so program doesn't crash
             
             if (iteration % 50 == 0) or (iteration % training_batches == 0):
-                torch.save(generator.state_dict(), f'models/generator_{epoch_count}_{batch_idx}.pth')
+                torch.save(generator.state_dict(), f'models/generator_{epoch_count}_{batch_idx}.pth') # Save models
                 torch.save(discriminator.state_dict(), f'models/discriminator_{epoch_count}_{batch_idx}.pth')
-
-
-            #print("Loop finished")
-            endt = time.time()
-            dif = endt-startt
-            #print(f"{dif} seconds")
-    loc = {
-        '1': 'vimeo',
-        '2': 'msu'
-    }
-    
+   
     print("Model trained, saving as .pth files")
 
-    save_loc = loc.get(dataset_choice)
     torch.save(generator.state_dict(), f'models/generator_final.pth')
     torch.save(discriminator.state_dict(), f'models/discriminator_final.pth')
 
+# Plotting evaluations
     print("Plotting model loss graph")
     plt.figure(figsize=(10,5))
     plt.title("Generator and Discriminator Loss During Training")
@@ -411,7 +395,7 @@ if __name__ == '__main__':
         plt.figure(figsize=(8,8))
         plt.title(f"Set {i+1} of Generated Frames")
         plt.axis("off")
-        plt.imshow(generated_frames[i].permute(1, 2, 0).numpy())
+        plt.imshow(generated_frames[i].permute(1, 2, 0).numpy()) # Reformatted array to match matplots requirements
         plt.savefig(f'plots/generated{i+1}.png', dpi=300, bbox_inches='tight')
         plt.show()
         print(f"Plotted {i+1}/{len(generated_frames)} ({((i+1)/(len(generated_frames))*100):.2f}%)", end='\r', flush=True)
