@@ -1,7 +1,7 @@
 """
 Title: Generative Adversarial Network - Video Frame Interpolation (GAN-VFI)
 Author: Chris McDonald
-Date: February 20, 2024
+Date: April 23, 2024
 
 Description:
 This script is used to calculate the mean and standard deviation of pixel values for each channel across every image in the dataset.
