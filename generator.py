@@ -1,62 +1,53 @@
 import torch.nn as nn
 import torch
+
 class VimeoGenerator2(nn.Module):
     def __init__(self):
         super(VimeoGenerator2, self).__init__()
-        self.feature_groups = 32  # the size of feature map
-        self.channels = 3
-        filter_size = 4
-        stride_size = 2
+        self.feature_groups = 32  # the size of the feature map
+        self.channels = 3 # target channels (rgb)
+        filter_size = 4 # params
+        stride_size = 2 #params
         
-        self.down_sample_blocks = nn.Sequential(
-            nn.Conv2d(self.channels * 2, self.feature_groups * 2, kernel_size=3, stride=1, padding=1, bias=False),  # size
+        self.down_blocks = nn.Sequential( # stacks neural network layers
+            nn.Conv2d(self.channels * 2, self.feature_groups * 2, kernel_size=3, stride=1, padding=1, bias=False),  # increases number of channels from 6 to 64
+            nn.BatchNorm2d(self.feature_groups * 2), # normalizes activations using stdev and mean
+            nn.LeakyReLU(0.02, inplace=True), # allows small negative inputs through
+            nn.Conv2d(self.feature_groups * 2, self.feature_groups * 2, kernel_size=filter_size, stride=stride_size, padding=1, bias=False),
             nn.BatchNorm2d(self.feature_groups * 2),
             nn.LeakyReLU(0.02, inplace=True),
-            nn.Conv2d(self.feature_groups * 2, self.feature_groups * 2, kernel_size=filter_size, stride=stride_size, padding=1, bias=False),  # size/2
-            nn.BatchNorm2d(self.feature_groups * 2),
-            nn.LeakyReLU(0.02, inplace=True),
-            nn.Conv2d(self.feature_groups * 2, self.feature_groups * 4, kernel_size=filter_size, stride=stride_size, padding=1, bias=False),  # size/2
+            nn.Conv2d(self.feature_groups * 2, self.feature_groups * 4, kernel_size=filter_size, stride=stride_size, padding=1, bias=False),
             nn.BatchNorm2d(self.feature_groups * 4),
             nn.LeakyReLU(0.02, inplace=True),
-            nn.Conv2d(self.feature_groups * 4, self.feature_groups * 8, kernel_size=filter_size, stride=stride_size, padding=1, bias=False),  # size/2
+            nn.Conv2d(self.feature_groups * 4, self.feature_groups * 8, kernel_size=filter_size, stride=stride_size, padding=1, bias=False),
             nn.BatchNorm2d(self.feature_groups * 8),
             nn.LeakyReLU(0.02, inplace=True),
-            nn.Conv2d(self.feature_groups * 8, self.feature_groups * 16, kernel_size=filter_size, stride=stride_size, padding=1, bias=False),  # size/2
+            nn.Conv2d(self.feature_groups * 8, self.feature_groups * 16, kernel_size=filter_size, stride=stride_size, padding=1, bias=False),
             nn.BatchNorm2d(self.feature_groups * 16),
             nn.LeakyReLU(0.02, inplace=True),
             )
-
-        self.up_sample_block = nn.Sequential(
-            nn.ConvTranspose2d(self.feature_groups * 16, self.feature_groups * 8, kernel_size=filter_size, stride=stride_size, padding=1, bias=False),  # size*2
+        
+        self.up_block = nn.Sequential(
+            nn.ConvTranspose2d(self.feature_groups * 16, self.feature_groups * 8, kernel_size=filter_size, stride=stride_size, padding=1, bias=False), # decreases channels by 2
             nn.BatchNorm2d(self.feature_groups * 8),
             nn.LeakyReLU(0.02, inplace=True),
-            nn.ConvTranspose2d(self.feature_groups * 8, self.feature_groups * 4, kernel_size=filter_size, stride=stride_size, padding=1, bias=False),  # size*2
+            nn.ConvTranspose2d(self.feature_groups * 8, self.feature_groups * 4, kernel_size=filter_size, stride=stride_size, padding=1, bias=False),
             nn.BatchNorm2d(self.feature_groups * 4),
             nn.LeakyReLU(0.02, inplace=True),
-            nn.ConvTranspose2d(self.feature_groups * 4, self.feature_groups * 2, kernel_size=filter_size, stride=stride_size, padding=1, bias=False),  # size*2
+            nn.ConvTranspose2d(self.feature_groups * 4, self.feature_groups * 2, kernel_size=filter_size, stride=stride_size, padding=1, bias=False),
             nn.BatchNorm2d(self.feature_groups * 2),
             nn.LeakyReLU(0.02, inplace=True),
-            nn.ConvTranspose2d(self.feature_groups * 2, self.feature_groups, kernel_size=filter_size, stride=stride_size, padding=1, bias=False),  # size*2
+            nn.ConvTranspose2d(self.feature_groups * 2, self.feature_groups, kernel_size=filter_size, stride=stride_size, padding=1, bias=False),
             nn.BatchNorm2d(self.feature_groups),
             nn.LeakyReLU(0.02, inplace=True),
-            nn.ConvTranspose2d(self.feature_groups, self.channels, kernel_size=3, stride=1, padding=1, bias=False),  # size
-            nn.Tanh()
+            nn.ConvTranspose2d(self.feature_groups, self.channels, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.Tanh() # forces values between the range -1 and 1
             )
     
     def forward(self, tensor0, tensor2):
-        #print(f"Tensor 0 contiguous: {tensor0.is_contiguous()}")
-        #print(f"Tensor 2 contiguous: {tensor2.is_contiguous()}")
-        out = torch.cat((tensor0, tensor2), 1)  # @UndefinedVariable
-        
-        #print(f"Cat: {out.shape}")
-        #print(f"Concatenated output contiguous: {out.is_contiguous()}")
-
-        out_down = self.down_sample_blocks(out)
-        #print(f"Down: {out_down.shape}")
-        out_up = self.up_sample_block(out_down)
-        #print(f"Up: {out_up.shape}")
-
-        return out_up
+        inTensor = torch.cat((tensor0, tensor2), 1)  # combines 2 tensor frames along the channel dimension
+        outTensor = self.up_block(self.down_blocks(inTensor)) # applies the generators layers to the tensor
+        return outTensor
 
 class Generator2DVimeo(nn.Module):
     def __init__(self, z_dim, colour_channels, features_g):
